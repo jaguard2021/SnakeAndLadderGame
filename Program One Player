@@ -1,0 +1,134 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract SnakeAndLadderGame {
+    address public owner;
+    address public player;
+    address public connectedWallet;
+    uint256 public currentPlayerPosition;
+    bool public gameEnded;
+    uint256 public totalRoundsPlayed;
+    address public bestPlayer;
+    uint256 public bestScore;
+    uint256 public totalTimePlayed;
+
+    uint256 public gameFee = 0.0001 ether; // Fee Player
+    
+    event PlayerConnected(address wallet);
+    event PlayerMoved(address player, uint256 newPosition);
+    event GameEnded(address winner, uint256 roundsPlayed, uint256 score, uint256 timePlayed);
+
+    constructor() {
+        owner = msg.sender;
+        currentPlayerPosition = 1;
+        gameEnded = false;
+    }
+    
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only the owner can call this function");
+        _;
+    }
+    
+    modifier onlyPlayer() {
+        require(msg.sender == player, "Only the current player can call this function");
+        _;
+    }
+
+    modifier onlyConnectedPlayer() {
+        require(msg.sender == connectedWallet, "Only the connected player can call this function");
+        _;
+    }
+    
+    modifier gameNotEnded() {
+        require(!gameEnded, "The game has ended");
+        _;
+    }
+    
+    function connectWallet(address wallet) external onlyOwner {
+        require(connectedWallet == address(0), "Wallet is already connected");
+        connectedWallet = wallet;
+        emit PlayerConnected(wallet);
+    }
+    
+    function startGame() external payable onlyOwner {
+        require(connectedWallet != address(0), "Connected wallet is required to start the game");
+        require(player == address(0), "Game has already started");
+        require(msg.value >= gameFee, "Insufficient game fee");
+        player = connectedWallet;
+    }
+    
+    function rollDice() external onlyConnectedPlayer gameNotEnded returns (uint256) {
+        require(msg.sender == player, "Only the current player can roll the dice");
+        uint256 diceResult = (uint256(keccak256(abi.encodePacked(block.timestamp, block.difficulty, player))) % 6) + 1;
+        uint256 newPosition = currentPlayerPosition + diceResult;
+
+        // Check if the new position is connected to a snake or ladder
+        if (newPosition == 14) {
+            newPosition = 4; // Snake: Go down to position 4
+        } else if (newPosition == 22) {
+            newPosition = 8; // Snake: Go down to position 8
+        } else if (newPosition == 38) {
+            newPosition = 20; // Snake: Go down to position 20
+        } else if (newPosition == 48) {
+            newPosition = 24; // Snake: Go down to position 24
+        } else if (newPosition == 55) {
+            newPosition = 37; // Snake: Go down to position 37
+        } else if (newPosition == 67) {
+            newPosition = 34; // Snake: Go down to position 34
+        } else if (newPosition == 73) {
+            newPosition = 56; // Snake: Go down to position 56
+        } else if (newPosition == 82) {
+            newPosition = 63; // Snake: Go down to position 63
+        } else if (newPosition == 93) {
+            newPosition = 72; // Snake: Go down to position 72
+        } else if (newPosition == 5) {
+            newPosition = 25; // Ladder: Go up to position 25
+        } else if (newPosition == 10) {
+            newPosition = 29; // Ladder: Go up to position 29
+        } else if (newPosition == 19) {
+            newPosition = 40; // Ladder: Go up to position 40
+        } else if (newPosition == 27) {
+            newPosition = 53; // Ladder: Go up to position 53
+        } else if (newPosition == 50) {
+            newPosition = 69; // Ladder: Go up to position 69
+        } else if (newPosition == 71) {
+            newPosition = 91; // Ladder: Go up to position 91
+        }
+
+        if (newPosition >= 100) {
+            gameEnded = true;
+            emit GameEnded(player, totalRoundsPlayed, bestScore, totalTimePlayed);
+            return diceResult;
+        }
+        
+        currentPlayerPosition = newPosition;
+        emit PlayerMoved(player, newPosition);
+
+        // Update statistics
+        totalRoundsPlayed++;
+        if (newPosition > bestScore) {
+            bestScore = newPosition;
+            bestPlayer = player;
+        }
+
+        return diceResult;
+    }
+    
+    function getPlayerPosition() external view returns (uint256) {
+        return currentPlayerPosition;
+    }
+    
+    function finishGame() external onlyConnectedPlayer gameNotEnded {
+        require(msg.sender == player, "Only the current player can finish the game");
+        gameEnded = true;
+        emit GameEnded(player, totalRoundsPlayed, bestScore, totalTimePlayed);
+    }
+
+    function startNewGame() external onlyOwner {
+        require(gameEnded, "The previous game must be ended");
+        gameEnded = false;
+        currentPlayerPosition = 1;
+        player = address(0);
+        totalTimePlayed = 0;
+    }
+}
